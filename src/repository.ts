@@ -13,6 +13,8 @@ export interface NewSurveyInput {
   driverName: string;
   surveyorName: string;
   dutyNumber: string;
+  vehicleNumber: string;
+  routeName: string;
   routeNumber: string;
   originStop: string;
   originDepartureTime: string;

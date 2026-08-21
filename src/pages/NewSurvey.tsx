@@ -22,6 +22,8 @@ export default function NewSurvey() {
   const [driverName, setDriverName] = useState("");
   const [surveyorName, setSurveyorName] = useState("");
   const [dutyNumber, setDutyNumber] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
+  const [routeName, setRouteName] = useState("");
   const [routeNumber, setRouteNumber] = useState("");
   const [originStop, setOriginStop] = useState("");
   const [originDepartureTime, setOriginDepartureTime] = useState(nowTime());
@@ -41,6 +43,8 @@ export default function NewSurvey() {
         driverName: driverName.trim(),
         surveyorName: surveyorName.trim(),
         dutyNumber: dutyNumber.trim(),
+        vehicleNumber: vehicleNumber.trim(),
+        routeName: routeName.trim(),
         routeNumber: routeNumber.trim(),
         originStop: originStop.trim(),
         originDepartureTime,
@@ -74,19 +78,19 @@ export default function NewSurvey() {
           </div>
           <div className="field-row">
             <div className="field">
-              <label>運転者名</label>
+              <label>乗務員氏名</label>
               <input
                 value={driverName}
                 onChange={(e) => setDriverName(e.target.value)}
-                placeholder="運転者名"
+                placeholder="乗務員氏名"
               />
             </div>
             <div className="field">
-              <label>調査員名</label>
+              <label>調査員氏名</label>
               <input
                 value={surveyorName}
                 onChange={(e) => setSurveyorName(e.target.value)}
-                placeholder="調査員名"
+                placeholder="調査員氏名"
               />
             </div>
           </div>
@@ -96,7 +100,28 @@ export default function NewSurvey() {
               <input
                 value={dutyNumber}
                 onChange={(e) => setDutyNumber(e.target.value)}
-                placeholder="例: 12"
+                placeholder="例: 神4"
+              />
+            </div>
+            <div className="field">
+              <label>車号</label>
+              <input
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value)}
+                placeholder="例: 1704"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="field-row">
+            <div className="field">
+              <label>路線名</label>
+              <input
+                value={routeName}
+                onChange={(e) => setRouteName(e.target.value)}
+                placeholder="例: 神山線"
               />
             </div>
             <div className="field">
@@ -104,23 +129,20 @@ export default function NewSurvey() {
               <input
                 value={routeNumber}
                 onChange={(e) => setRouteNumber(e.target.value)}
-                placeholder="例: 3"
+                placeholder="例: 2541"
               />
             </div>
           </div>
-        </div>
-
-        <div className="card">
           <div className="field">
-            <label>起点バス停 *</label>
+            <label>始発停留所 *</label>
             <input
               value={originStop}
               onChange={(e) => setOriginStop(e.target.value)}
-              placeholder="起点バス停名"
+              placeholder="始発停留所名"
             />
           </div>
           <div className="field">
-            <label>起点発時刻</label>
+            <label>始発時刻</label>
             <input
               type="time"
               value={originDepartureTime}
@@ -128,11 +150,11 @@ export default function NewSurvey() {
             />
           </div>
           <div className="field">
-            <label>終点バス停</label>
+            <label>終着停留所</label>
             <input
               value={destinationStop}
               onChange={(e) => setDestinationStop(e.target.value)}
-              placeholder="終点バス停名"
+              placeholder="終着停留所名"
             />
           </div>
           <div className="field">
@@ -143,7 +165,7 @@ export default function NewSurvey() {
               step="0.1"
               value={routeDistanceKm}
               onChange={(e) => setRouteDistanceKm(e.target.value)}
-              placeholder="例: 12.5"
+              placeholder="例: 30.9"
             />
           </div>
         </div>

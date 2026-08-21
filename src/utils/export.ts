@@ -1,75 +1,140 @@
 import {
   ATTRIBUTE_LABEL,
-  GENDER_LABEL,
+  GENDER_SHEET_LABEL,
   PAYMENT_METHOD_LABEL,
   type PassengerRecord,
   type Survey,
 } from "../types";
 
-function formatTimestamp(ts: number | null): string {
-  if (!ts) return "";
-  const d = new Date(ts);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(
-    d.getMinutes(),
-  ).padStart(2, "0")}`;
-}
+type Cell = string | number;
 
-const BASIC_INFO_HEADER = [
-  "日付",
-  "運転者名",
-  "調査員名",
-  "仕業番号",
+const HEADER_LABELS_1 = ["日付", "仕業番号", "車号", "乗務員氏名", "調査員氏名"];
+const HEADER_LABELS_2 = [
+  "路線名",
   "系統番号",
-  "起点バス停",
-  "起点発時刻",
-  "終点バス停",
-  "終点着時刻",
+  "始発停留所",
+  "始発時刻",
+  "終着停留所",
+  "終着時刻",
   "系統キロ",
-  "状態",
+];
+const DATA_HEADER = [
+  "停留所名",
+  "乗車No.",
+  "性別",
+  "料金区分",
+  "降車No.",
+  "支払区分",
+  "区間料金",
+  "備考",
 ];
 
-function basicInfoRow(survey: Survey): (string | number)[] {
+interface SurveyEvent {
+  time: number;
+  stopName: string;
+  kind: "boarding" | "alighting";
+  passenger: PassengerRecord;
+}
+
+function buildEvents(passengers: PassengerRecord[]): SurveyEvent[] {
+  const events: SurveyEvent[] = [];
+  for (const p of passengers) {
+    events.push({
+      time: p.boardedAt,
+      stopName: p.boardingStopName,
+      kind: "boarding",
+      passenger: p,
+    });
+    if (p.status === "alighted") {
+      events.push({
+        time: p.alightedAt ?? p.boardedAt,
+        stopName: p.alightingStopName ?? "",
+        kind: "alighting",
+        passenger: p,
+      });
+    }
+  }
+  events.sort((a, b) => a.time - b.time || a.passenger.passengerNumber - b.passenger.passengerNumber);
+  return events;
+}
+
+// 調査員入力シートの慣例：同一停留所が連続する場合、2行目以降の停留所名は空欄にする
+function eventRows(passengers: PassengerRecord[]): Cell[][] {
+  const events = buildEvents(passengers);
+  const rows: Cell[][] = [];
+  let lastStopName: string | null = null;
+  for (const ev of events) {
+    const showStopName = ev.stopName !== lastStopName;
+    lastStopName = ev.stopName;
+    const p = ev.passenger;
+    if (ev.kind === "boarding") {
+      rows.push([
+        showStopName ? ev.stopName : "",
+        p.passengerNumber,
+        GENDER_SHEET_LABEL[p.gender],
+        ATTRIBUTE_LABEL[p.attribute],
+        "",
+        "",
+        "",
+        "",
+      ]);
+    } else {
+      rows.push([
+        showStopName ? ev.stopName : "",
+        "",
+        "",
+        "",
+        p.passengerNumber,
+        p.paymentMethod ? PAYMENT_METHOD_LABEL[p.paymentMethod] : "",
+        p.fare ?? "",
+        "",
+      ]);
+    }
+  }
+  return rows;
+}
+
+function surveySheetRows(survey: Survey, passengers: PassengerRecord[]): Cell[][] {
   return [
-    survey.date,
-    survey.driverName,
-    survey.surveyorName,
-    survey.dutyNumber,
-    survey.routeNumber,
-    survey.originStop,
-    survey.originDepartureTime,
-    survey.destinationStop,
-    survey.destinationArrivalTime,
-    survey.routeDistanceKm ?? "",
-    survey.status === "completed" ? "完了" : "調査中",
+    ["調査員入力シート"],
+    HEADER_LABELS_1,
+    [
+      survey.date,
+      survey.dutyNumber,
+      survey.vehicleNumber,
+      survey.driverName,
+      survey.surveyorName,
+    ],
+    HEADER_LABELS_2,
+    [
+      survey.routeName,
+      survey.routeNumber,
+      survey.originStop,
+      survey.originDepartureTime,
+      survey.destinationStop,
+      survey.destinationArrivalTime,
+      survey.routeDistanceKm ?? "",
+    ],
+    [],
+    DATA_HEADER,
+    ...eventRows(passengers),
   ];
 }
 
-const PASSENGER_HEADER = [
-  "客番号",
-  "乗車バス停",
-  "乗車時刻",
-  "性別",
-  "属性",
-  "降車バス停",
-  "降車時刻",
-  "決済手段",
-  "基本区間運賃",
-  "状態",
-];
+function sanitizeSheetName(name: string): string {
+  const cleaned = name.replace(/[:\\/?*[\]]/g, "").trim();
+  return (cleaned || "調査").slice(0, 31);
+}
 
-function passengerRow(p: PassengerRecord): (string | number)[] {
-  return [
-    p.passengerNumber,
-    p.boardingStopName,
-    formatTimestamp(p.boardedAt),
-    GENDER_LABEL[p.gender],
-    ATTRIBUTE_LABEL[p.attribute],
-    p.alightingStopName ?? "",
-    formatTimestamp(p.alightedAt),
-    p.paymentMethod ? PAYMENT_METHOD_LABEL[p.paymentMethod] : "",
-    p.fare ?? "",
-    p.status === "alighted" ? "降車済み" : "乗車中",
-  ];
+function uniqueSheetName(base: string, used: Set<string>): string {
+  let name = sanitizeSheetName(base);
+  let suffix = 2;
+  while (used.has(name)) {
+    name = sanitizeSheetName(`${base}(${suffix})`);
+    suffix += 1;
+  }
+  used.add(name);
+  return name;
 }
 
 export async function exportSurveyToExcel(
@@ -78,20 +143,10 @@ export async function exportSurveyToExcel(
 ): Promise<void> {
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
+  const sheet = XLSX.utils.aoa_to_sheet(surveySheetRows(survey, passengers));
+  XLSX.utils.book_append_sheet(wb, sheet, "調査員入力シート");
 
-  const basicSheet = XLSX.utils.aoa_to_sheet([
-    BASIC_INFO_HEADER,
-    basicInfoRow(survey),
-  ]);
-  XLSX.utils.book_append_sheet(wb, basicSheet, "基本情報");
-
-  const passengerSheet = XLSX.utils.aoa_to_sheet([
-    PASSENGER_HEADER,
-    ...passengers.map(passengerRow),
-  ]);
-  XLSX.utils.book_append_sheet(wb, passengerSheet, "乗降データ");
-
-  const filename = `調査_${survey.date}_系統${survey.routeNumber || "unknown"}.xlsx`;
+  const filename = `調査_${survey.date}_${survey.dutyNumber || survey.routeNumber || "unknown"}.xlsx`;
   XLSX.writeFile(wb, filename);
 }
 
@@ -102,27 +157,28 @@ export async function exportAllSurveysToExcel(
   const XLSX = await import("xlsx");
   const wb = XLSX.utils.book_new();
 
-  const basicRows = surveys.map(basicInfoRow);
-  const basicSheet = XLSX.utils.aoa_to_sheet([BASIC_INFO_HEADER, ...basicRows]);
-  XLSX.utils.book_append_sheet(wb, basicSheet, "基本情報一覧");
-
-  const passengerRows: (string | number)[][] = [];
+  const byDuty = new Map<string, Survey[]>();
   for (const survey of surveys) {
-    const passengers = passengersBySurveyId.get(survey.id) ?? [];
-    for (const p of passengers) {
-      passengerRows.push([
-        survey.date,
-        survey.routeNumber,
-        survey.dutyNumber,
-        ...passengerRow(p),
-      ]);
-    }
+    const key = survey.dutyNumber || "調査";
+    const list = byDuty.get(key) ?? [];
+    list.push(survey);
+    byDuty.set(key, list);
   }
-  const passengerSheet = XLSX.utils.aoa_to_sheet([
-    ["日付", "系統番号", "仕業番号", ...PASSENGER_HEADER],
-    ...passengerRows,
-  ]);
-  XLSX.utils.book_append_sheet(wb, passengerSheet, "乗降データ一覧");
+
+  const used = new Set<string>();
+  for (const [dutyKey, dutySurveys] of byDuty) {
+    dutySurveys.sort((a, b) => a.createdAt - b.createdAt);
+    const multiple = dutySurveys.length > 1;
+    dutySurveys.forEach((survey, index) => {
+      const passengers = passengersBySurveyId.get(survey.id) ?? [];
+      const sheetName = uniqueSheetName(
+        multiple ? `${dutyKey}-${index + 1}` : dutyKey,
+        used,
+      );
+      const sheet = XLSX.utils.aoa_to_sheet(surveySheetRows(survey, passengers));
+      XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+    });
+  }
 
   XLSX.writeFile(wb, `徳島バス調査データ_全件.xlsx`);
 }

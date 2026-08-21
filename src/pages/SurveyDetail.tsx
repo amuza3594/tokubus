@@ -105,9 +105,11 @@ export default function SurveyDetail() {
           <div className="meta" style={{ lineHeight: 1.8 }}>
             日付: {survey.date}
             <br />
-            運転者: {survey.driverName || "-"}／調査員: {survey.surveyorName || "-"}
+            乗務員: {survey.driverName || "-"}／調査員: {survey.surveyorName || "-"}
             <br />
-            仕業番号: {survey.dutyNumber || "-"}／系統番号: {survey.routeNumber || "-"}
+            仕業番号: {survey.dutyNumber || "-"}／車号: {survey.vehicleNumber || "-"}
+            <br />
+            路線名: {survey.routeName || "-"}／系統番号: {survey.routeNumber || "-"}
             <br />
             {survey.originStop || "-"}（{survey.originDepartureTime || "-"}） →{" "}
             {survey.destinationStop || "-"}（{survey.destinationArrivalTime || "-"}）
