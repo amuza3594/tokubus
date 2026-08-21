@@ -16,6 +16,7 @@ export interface NewSurveyInput {
   vehicleNumber: string;
   routeName: string;
   routeNumber: string;
+  direction: "往" | "復" | null;
   originStop: string;
   originDepartureTime: string;
   destinationStop: string;
@@ -30,6 +31,7 @@ export async function createSurvey(input: NewSurveyInput): Promise<Survey> {
     ...input,
     status: "in_progress",
     nextPassengerNumber: 1,
+    currentStopIndex: 0,
     createdAt: now,
     updatedAt: now,
   };

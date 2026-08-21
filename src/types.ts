@@ -71,6 +71,7 @@ export interface Survey {
   vehicleNumber: string; // 車号
   routeName: string; // 路線名
   routeNumber: string; // 系統番号
+  direction: "往" | "復" | null; // 停留所マスタの参照に使う上下区分（同一系統番号で往復両方がある場合のみ意味を持つ）
   originStop: string; // 始発停留所
   originDepartureTime: string; // 始発時刻 HH:MM
   destinationStop: string; // 終着停留所
@@ -78,6 +79,7 @@ export interface Survey {
   routeDistanceKm: number | null; // 系統キロ
   status: SurveyStatus;
   nextPassengerNumber: number;
+  currentStopIndex: number; // バス停マスタ利用時の現在位置（マスタ未使用の系統では常に0）
   createdAt: number;
   updatedAt: number;
 }

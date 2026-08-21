@@ -6,6 +6,7 @@ import {
   addBoardingPassenger,
   completeSurvey,
   recordAlighting,
+  updateSurvey,
 } from "../repository";
 import {
   ATTRIBUTE_LABEL,
@@ -16,7 +17,9 @@ import {
   type PassengerRecord,
   type PaymentMethod,
 } from "../types";
+import { getStopSequence } from "../stopMaster";
 import AlightingModal from "../components/AlightingModal";
+import StopCarousel from "../components/StopCarousel";
 
 function nowTime() {
   const d = new Date();
@@ -44,7 +47,7 @@ export default function SurveyTrip() {
     [surveyId],
   );
 
-  const [currentStop, setCurrentStop] = useState("");
+  const [manualStop, setManualStop] = useState("");
   const [selectedGender, setSelectedGender] = useState<Gender | null>(null);
   const [selectedAttribute, setSelectedAttribute] = useState<Attribute | null>(
     null,
@@ -52,6 +55,12 @@ export default function SurveyTrip() {
   const [alightingTarget, setAlightingTarget] =
     useState<PassengerRecord | null>(null);
   const [finishing, setFinishing] = useState(false);
+
+  const stopSequence = useMemo(
+    () =>
+      survey ? getStopSequence(survey.routeNumber, survey.direction) : null,
+    [survey],
+  );
 
   const stopSuggestions = useMemo(() => {
     const set = new Set<string>();
@@ -71,8 +80,17 @@ export default function SurveyTrip() {
     return <div className="page">調査が見つかりません。</div>;
   }
 
+  const currentStop = stopSequence
+    ? (stopSequence[survey.currentStopIndex] ?? stopSequence[0])
+    : manualStop;
+
   const onboard = passengers.filter((p) => p.status === "onboard");
   const alightedCount = passengers.length - onboard.length;
+
+  async function handleStopIndexChange(newIndex: number) {
+    if (!surveyId) return;
+    await updateSurvey(surveyId, { currentStopIndex: newIndex });
+  }
 
   async function handleAddBoarding() {
     if (!surveyId || !selectedGender || !selectedAttribute) return;
@@ -138,21 +156,31 @@ export default function SurveyTrip() {
 
         <div className="stop-header">
           <div className="label">現在のバス停</div>
-          <div className="field-row">
-            <div className="field" style={{ marginBottom: 0 }}>
-              <input
-                value={currentStop}
-                onChange={(e) => setCurrentStop(e.target.value)}
-                placeholder="停留所名を入力"
-                list="stop-suggestions"
-              />
-            </div>
-          </div>
-          <datalist id="stop-suggestions">
-            {stopSuggestions.map((s) => (
-              <option key={s} value={s} />
-            ))}
-          </datalist>
+          {stopSequence ? (
+            <StopCarousel
+              stops={stopSequence}
+              index={survey.currentStopIndex}
+              onIndexChange={handleStopIndexChange}
+            />
+          ) : (
+            <>
+              <div className="field-row">
+                <div className="field" style={{ marginBottom: 0 }}>
+                  <input
+                    value={manualStop}
+                    onChange={(e) => setManualStop(e.target.value)}
+                    placeholder="停留所名を入力"
+                    list="stop-suggestions"
+                  />
+                </div>
+              </div>
+              <datalist id="stop-suggestions">
+                {stopSuggestions.map((s) => (
+                  <option key={s} value={s} />
+                ))}
+              </datalist>
+            </>
+          )}
         </div>
 
         <div className="card">
