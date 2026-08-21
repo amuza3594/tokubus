@@ -126,6 +126,15 @@ a {
   color: var(--color-text);
   width: 100%;
   min-width: 0;
+  box-sizing: border-box;
+}
+
+.field input[type="date"],
+.field input[type="time"] {
+  /* iOSなどネイティブ部品が独自の縁取りを描画し、こちらの枠線と二重になって
+     ずれて見えることがあるため、ネイティブの外観を無効化して統一する */
+  -webkit-appearance: none;
+  appearance: none;
 }
 
 .field-row {
