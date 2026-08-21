@@ -13,11 +13,11 @@
   "dependencies": {
     "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",
+    "exceljs": "^4.4.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",
-    "uuid": "^14.0.2",
-    "xlsx": "^0.18.5"
+    "uuid": "^14.0.2"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",

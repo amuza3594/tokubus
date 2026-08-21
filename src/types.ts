@@ -41,14 +41,14 @@ export type PaymentMethod =
   | "cash" // 現金
   | "pass" // 定期券
   | "coupon_ticket" // 回数券
-  | "icoca" // ICOCA
+  | "icoca" // 交通系IC
   | "shown_ticket"; // 見せ券
 
 export const PAYMENT_METHOD_LABEL: Record<PaymentMethod, string> = {
   cash: "現金",
   pass: "定期券",
   coupon_ticket: "回数券",
-  icoca: "ICOCA",
+  icoca: "交通系IC",
   shown_ticket: "見せ券",
 };
 

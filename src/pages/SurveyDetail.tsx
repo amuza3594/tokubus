@@ -12,12 +12,13 @@ import {
   PAYMENT_METHOD_LABEL,
   type PassengerRecord,
 } from "../types";
-import { exportSurveyToExcel } from "../utils/export";
+import { exportSurveyToExcel, getSurveyExcelBlob } from "../utils/export";
 
 export default function SurveyDetail() {
   const { surveyId } = useParams<{ surveyId: string }>();
   const navigate = useNavigate();
   const [editing, setEditing] = useState<PassengerRecord | null>(null);
+  const [sharing, setSharing] = useState(false);
 
   const survey = useLiveQuery(
     () => (surveyId ? db.surveys.get(surveyId) : undefined),
@@ -76,6 +77,34 @@ export default function SurveyDetail() {
     ) {
       await deleteSurvey(survey.id);
       navigate("/", { replace: true });
+    }
+  }
+
+  async function handleShareByEmail() {
+    if (!survey || !passengers) return;
+    setSharing(true);
+    try {
+      const { blob, filename } = await getSurveyExcelBlob(survey, passengers);
+      const file = new File([blob], filename, { type: blob.type });
+      const nav = navigator as Navigator & {
+        canShare?: (data: { files: File[] }) => boolean;
+        share?: (data: { files: File[]; title?: string; text?: string }) => Promise<void>;
+      };
+      if (nav.canShare?.({ files: [file] }) && nav.share) {
+        await nav.share({
+          files: [file],
+          title: filename,
+          text: `${survey.date} 系統${survey.routeNumber || ""} の調査データ`,
+        });
+      } else {
+        alert(
+          "この端末・ブラウザはファイル共有に対応していません。「この調査をExcel出力」でダウンロードし、メールに手動で添付してください。",
+        );
+      }
+    } catch (err) {
+      if ((err as Error).name !== "AbortError") throw err;
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -145,13 +174,21 @@ export default function SurveyDetail() {
           </div>
         </div>
 
-        <button
-          className="btn btn-primary"
-          style={{ marginBottom: 16 }}
-          onClick={() => void exportSurveyToExcel(survey, passengers)}
-        >
-          この調査をExcel出力
-        </button>
+        <div className="btn-group" style={{ marginBottom: 16 }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => void exportSurveyToExcel(survey, passengers)}
+          >
+            この調査をExcel出力
+          </button>
+          <button
+            className="btn btn-secondary"
+            disabled={sharing}
+            onClick={() => void handleShareByEmail()}
+          >
+            メールに添付して送信
+          </button>
+        </div>
 
         <div className="section-title">乗降データ（タップで編集）</div>
         {passengers.length === 0 ? (

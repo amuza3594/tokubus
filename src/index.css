@@ -125,6 +125,7 @@ a {
   background: #fff;
   color: var(--color-text);
   width: 100%;
+  min-width: 0;
 }
 
 .field-row {

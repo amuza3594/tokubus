@@ -1,3 +1,4 @@
+import type { Borders, Workbook } from "exceljs";
 import {
   ATTRIBUTE_LABEL,
   GENDER_SHEET_LABEL,
@@ -28,6 +29,17 @@ const DATA_HEADER = [
   "区間料金",
   "備考",
 ];
+
+// A列:16, B〜G列:11.40, H列:20.00（Excelの列幅単位）
+const COLUMN_WIDTHS = [16, 11.4, 11.4, 11.4, 11.4, 11.4, 11.4, 20];
+
+const THIN_BORDER: Borders = {
+  top: { style: "thin" },
+  left: { style: "thin" },
+  bottom: { style: "thin" },
+  right: { style: "thin" },
+  diagonal: {},
+};
 
 interface SurveyEvent {
   time: number;
@@ -137,25 +149,51 @@ function uniqueSheetName(base: string, used: Set<string>): string {
   return name;
 }
 
-export async function exportSurveyToExcel(
+function addSurveySheet(
+  workbook: Workbook,
+  sheetName: string,
   survey: Survey,
   passengers: PassengerRecord[],
-): Promise<void> {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.utils.book_new();
-  const sheet = XLSX.utils.aoa_to_sheet(surveySheetRows(survey, passengers));
-  XLSX.utils.book_append_sheet(wb, sheet, "調査員入力シート");
+) {
+  const worksheet = workbook.addWorksheet(sheetName);
+  const rows = surveySheetRows(survey, passengers);
+  worksheet.columns = COLUMN_WIDTHS.map((width) => ({ width }));
+  worksheet.addRows(rows);
 
-  const filename = `調査_${survey.date}_${survey.dutyNumber || survey.routeNumber || "unknown"}.xlsx`;
-  XLSX.writeFile(wb, filename);
+  function border(rowStart: number, rowEnd: number, colStart: number, colEnd: number) {
+    for (let r = rowStart; r <= rowEnd; r++) {
+      for (let c = colStart; c <= colEnd; c++) {
+        worksheet.getCell(r, c).border = THIN_BORDER;
+      }
+    }
+  }
+
+  // 基本情報（日付〜調査員氏名）
+  border(2, 3, 1, 5);
+  // 路線情報（路線名〜系統キロ）
+  border(4, 5, 1, 7);
+  // 乗降データ（見出し＋データ行）
+  border(7, rows.length, 1, 8);
+
+  return worksheet;
 }
 
-export async function exportAllSurveysToExcel(
+async function buildSurveyWorkbook(
+  survey: Survey,
+  passengers: PassengerRecord[],
+): Promise<Workbook> {
+  const { Workbook } = await import("exceljs");
+  const workbook = new Workbook();
+  addSurveySheet(workbook, "調査員入力シート", survey, passengers);
+  return workbook;
+}
+
+async function buildAllSurveysWorkbook(
   surveys: Survey[],
   passengersBySurveyId: Map<string, PassengerRecord[]>,
-): Promise<void> {
-  const XLSX = await import("xlsx");
-  const wb = XLSX.utils.book_new();
+): Promise<Workbook> {
+  const { Workbook } = await import("exceljs");
+  const workbook = new Workbook();
 
   const byDuty = new Map<string, Survey[]>();
   for (const survey of surveys) {
@@ -175,10 +213,57 @@ export async function exportAllSurveysToExcel(
         multiple ? `${dutyKey}-${index + 1}` : dutyKey,
         used,
       );
-      const sheet = XLSX.utils.aoa_to_sheet(surveySheetRows(survey, passengers));
-      XLSX.utils.book_append_sheet(wb, sheet, sheetName);
+      addSurveySheet(workbook, sheetName, survey, passengers);
     });
   }
 
-  XLSX.writeFile(wb, `徳島バス調査データ_全件.xlsx`);
+  return workbook;
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+const XLSX_MIME =
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export function surveyExcelFilename(survey: Survey): string {
+  return `調査_${survey.date}_${survey.dutyNumber || survey.routeNumber || "unknown"}.xlsx`;
+}
+
+export async function getSurveyExcelBlob(
+  survey: Survey,
+  passengers: PassengerRecord[],
+): Promise<{ blob: Blob; filename: string }> {
+  const workbook = await buildSurveyWorkbook(survey, passengers);
+  const buffer = await workbook.xlsx.writeBuffer();
+  return {
+    blob: new Blob([buffer], { type: XLSX_MIME }),
+    filename: surveyExcelFilename(survey),
+  };
+}
+
+export async function exportSurveyToExcel(
+  survey: Survey,
+  passengers: PassengerRecord[],
+): Promise<void> {
+  const { blob, filename } = await getSurveyExcelBlob(survey, passengers);
+  downloadBlob(blob, filename);
+}
+
+export async function exportAllSurveysToExcel(
+  surveys: Survey[],
+  passengersBySurveyId: Map<string, PassengerRecord[]>,
+): Promise<void> {
+  const workbook = await buildAllSurveysWorkbook(surveys, passengersBySurveyId);
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: XLSX_MIME });
+  downloadBlob(blob, "徳島バス調査データ_全件.xlsx");
 }
