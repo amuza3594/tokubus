@@ -80,7 +80,7 @@ export default function SurveyDetail() {
     }
   }
 
-  async function handleShareByEmail() {
+  async function handleShare() {
     if (!survey || !passengers) return;
     setSharing(true);
     try {
@@ -97,9 +97,8 @@ export default function SurveyDetail() {
           text: `${survey.date} 系統${survey.routeNumber || ""} の調査データ`,
         });
       } else {
-        alert(
-          "この端末・ブラウザはファイル共有に対応していません。「この調査をExcel出力」でダウンロードし、メールに手動で添付してください。",
-        );
+        // 共有に対応していない環境ではダウンロードにフォールバック
+        await exportSurveyToExcel(survey, passengers);
       }
     } catch (err) {
       if ((err as Error).name !== "AbortError") throw err;
@@ -174,21 +173,14 @@ export default function SurveyDetail() {
           </div>
         </div>
 
-        <div className="btn-group" style={{ marginBottom: 16 }}>
-          <button
-            className="btn btn-primary"
-            onClick={() => void exportSurveyToExcel(survey, passengers)}
-          >
-            この調査をExcel出力
-          </button>
-          <button
-            className="btn btn-secondary"
-            disabled={sharing}
-            onClick={() => void handleShareByEmail()}
-          >
-            メールに添付して送信
-          </button>
-        </div>
+        <button
+          className="btn btn-primary"
+          style={{ marginBottom: 16 }}
+          disabled={sharing}
+          onClick={() => void handleShare()}
+        >
+          共有
+        </button>
 
         <div className="section-title">乗降データ（タップで編集）</div>
         {passengers.length === 0 ? (
