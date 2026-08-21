@@ -173,14 +173,21 @@ export default function SurveyDetail() {
           </div>
         </div>
 
-        <button
-          className="btn btn-primary"
-          style={{ marginBottom: 16 }}
-          disabled={sharing}
-          onClick={() => void handleShare()}
-        >
-          共有
-        </button>
+        <div className="btn-group" style={{ marginBottom: 16 }}>
+          <button
+            className="btn btn-primary"
+            onClick={() => void exportSurveyToExcel(survey, passengers)}
+          >
+            Excelファイルで保存
+          </button>
+          <button
+            className="btn btn-secondary"
+            disabled={sharing}
+            onClick={() => void handleShare()}
+          >
+            共有
+          </button>
+        </div>
 
         <div className="section-title">乗降データ（タップで編集）</div>
         {passengers.length === 0 ? (
