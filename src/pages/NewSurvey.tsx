@@ -5,6 +5,8 @@ import {
   DIRECTION_LABEL,
   availableDirections,
   findRoute,
+  getRouteDestination,
+  getRouteDistanceKm,
   getStopSequence,
   type Direction,
 } from "../stopMaster";
@@ -59,15 +61,21 @@ export default function NewSurvey() {
     if (!stops || stops.length === 0) return;
     setOriginStop((prev) => (prev.trim() === "" ? stops[0] : prev));
     setDestinationStop((prev) => (prev.trim() === "" ? stops[stops.length - 1] : prev));
+    const distanceKm = getRouteDistanceKm(value, dirs[0] ?? null);
+    if (distanceKm !== null) {
+      setRouteDistanceKm((prev) => (prev.trim() === "" ? String(distanceKm) : prev));
+    }
   }
 
-  // 上下区分の切り替え：進行方向が変わるので起終点は常に入れ替える
+  // 上下区分の切り替え：進行方向が変わるので起終点・系統キロは常に入れ替える
   function handleDirectionChange(d: Direction) {
     setDirection(d);
     const stops = getStopSequence(routeNumber, d);
     if (!stops || stops.length === 0) return;
     setOriginStop(stops[0]);
     setDestinationStop(stops[stops.length - 1]);
+    const distanceKm = getRouteDistanceKm(routeNumber, d);
+    if (distanceKm !== null) setRouteDistanceKm(String(distanceKm));
   }
 
   const canSubmit = routeNumber.trim() !== "" && originStop.trim() !== "";
@@ -191,16 +199,20 @@ export default function NewSurvey() {
             <div className="field">
               <label>上下区分</label>
               <div className="chip-group">
-                {directions.map((d) => (
-                  <button
-                    type="button"
-                    key={d}
-                    className={"chip" + (effectiveDirection === d ? " selected" : "")}
-                    onClick={() => handleDirectionChange(d)}
-                  >
-                    {DIRECTION_LABEL[d]}
-                  </button>
-                ))}
+                {directions.map((d) => {
+                  const destination = getRouteDestination(routeNumber, d);
+                  return (
+                    <button
+                      type="button"
+                      key={d}
+                      className={"chip" + (effectiveDirection === d ? " selected" : "")}
+                      onClick={() => handleDirectionChange(d)}
+                    >
+                      {DIRECTION_LABEL[d]}
+                      {destination && `（${destination}ゆき）`}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
