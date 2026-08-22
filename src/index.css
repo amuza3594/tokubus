@@ -588,6 +588,7 @@ table.export-preview td {
 
 .bus-map-token {
   cursor: grab;
+  touch-action: none;
 }
 
 .bus-map-circle {
