@@ -1,0 +1,16 @@
+name = "tokubus-gtfs-admin"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+# 非機密の設定値（機密情報は `wrangler secret put` で別途設定する。README参照）
+[vars]
+GITHUB_OWNER = "amuza3594"
+GITHUB_REPO = "tokubus"
+GITHUB_BRANCH = "claude/tokushima-bus-survey-digitalization-j5syhq"
+
+# KVネームスペース: `wrangler kv namespace create ADMIN_KV` で作成後、
+# 表示されたidをここに設定する
+[[kv_namespaces]]
+binding = "ADMIN_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"

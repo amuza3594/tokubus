@@ -23,3 +23,7 @@ dist-ssr
 *.sln
 *.sw?
 dist-artifact
+
+# Cloudflare Worker (worker/) local dev
+.dev.vars
+.wrangler

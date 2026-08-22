@@ -17,7 +17,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
-import { REQUIRED_GTFS_FILES, buildStopMaster, buildFareTable } from "../src/gtfsBuilder.js";
+import { REQUIRED_GTFS_FILES, buildStopMaster, buildFareTable } from "../shared/gtfsBuilder.js";
 
 const GTFS_DIR = fileURLToPath(new URL("../data/gtfs/", import.meta.url));
 const STOP_MASTER_OUT = fileURLToPath(new URL("../src/data/stopMaster.json", import.meta.url));
