@@ -3,6 +3,7 @@ import Home from "./pages/Home";
 import NewSurvey from "./pages/NewSurvey";
 import SurveyTrip from "./pages/SurveyTrip";
 import SurveyDetail from "./pages/SurveyDetail";
+import Settings from "./pages/Settings";
 
 function App() {
   return (
@@ -13,6 +14,7 @@ function App() {
           <Route path="/new" element={<NewSurvey />} />
           <Route path="/survey/:surveyId/trip" element={<SurveyTrip />} />
           <Route path="/survey/:surveyId" element={<SurveyDetail />} />
+          <Route path="/settings" element={<Settings />} />
         </Routes>
       </div>
     </HashRouter>

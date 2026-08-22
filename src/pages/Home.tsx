@@ -32,6 +32,9 @@ export default function Home() {
     <>
       <div className="top-bar">
         <h1>徳島バス 系統実態調査</h1>
+        <Link className="back settings-icon" to="/settings" aria-label="設定">
+          ⚙
+        </Link>
       </div>
       <div className="page">
         {surveys && surveys.length > 0 && (

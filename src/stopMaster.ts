@@ -1,4 +1,4 @@
-import rawStopMaster from "./data/stopMaster.json";
+import { getActiveStopMaster, type RouteMaster } from "./gtfsOverride";
 
 export type Direction = "往" | "復";
 
@@ -7,23 +7,10 @@ export const DIRECTION_LABEL: Record<Direction, string> = {
   復: "復路",
 };
 
-interface RouteDirection {
-  stops: string[];
-  distanceKm: number | null;
-  destination: string;
-}
-
-interface RouteMaster {
-  name: string;
-  directions: Partial<Record<Direction, RouteDirection>>;
-}
-
-const stopMaster = rawStopMaster as Record<string, RouteMaster>;
-
 export function findRoute(routeNumber: string): RouteMaster | null {
   const key = routeNumber.trim();
   if (!key) return null;
-  return stopMaster[key] ?? null;
+  return getActiveStopMaster()[key] ?? null;
 }
 
 export function availableDirections(routeNumber: string): Direction[] {
@@ -37,7 +24,7 @@ export function availableDirections(routeNumber: string): Direction[] {
 function resolveDirection(
   routeNumber: string,
   direction: Direction | null,
-): RouteDirection | null {
+) {
   const route = findRoute(routeNumber);
   if (!route) return null;
   const dirs = availableDirections(routeNumber);

@@ -79,6 +79,11 @@ a {
   cursor: pointer;
 }
 
+.top-bar .settings-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
 .page {
   flex: 1;
   padding: 16px;
