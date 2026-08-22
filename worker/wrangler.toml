@@ -9,8 +9,7 @@ GITHUB_OWNER = "amuza3594"
 GITHUB_REPO = "tokubus"
 GITHUB_BRANCH = "claude/tokushima-bus-survey-digitalization-j5syhq"
 
-# KVネームスペース: `wrangler kv namespace create ADMIN_KV` で作成後、
-# 表示されたidをここに設定する
+# KVネームスペース（パスワードのハッシュを保存する場所）
 [[kv_namespaces]]
 binding = "ADMIN_KV"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "0a38e0da08acfc98e652cd818b4cf8c4"
