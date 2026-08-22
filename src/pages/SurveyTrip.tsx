@@ -6,6 +6,7 @@ import {
   addBoardingPassenger,
   completeSurvey,
   recordAlighting,
+  updatePassenger,
   updateSurvey,
 } from "../repository";
 import {
@@ -20,6 +21,7 @@ import {
 import { getStopSequence } from "../stopMaster";
 import AlightingModal from "../components/AlightingModal";
 import StopCarousel from "../components/StopCarousel";
+import BusFloorMap from "../components/BusFloorMap";
 
 function nowTime() {
   const d = new Date();
@@ -55,6 +57,7 @@ export default function SurveyTrip() {
   const [alightingTarget, setAlightingTarget] =
     useState<PassengerRecord | null>(null);
   const [finishing, setFinishing] = useState(false);
+  const [viewMode, setViewMode] = useState<"map" | "list">("list");
 
   const stopSequence = useMemo(
     () =>
@@ -101,6 +104,10 @@ export default function SurveyTrip() {
       selectedAttribute,
     );
     setSelectedAttribute(null);
+  }
+
+  async function handleMovePassenger(id: string, mapX: number, mapY: number) {
+    await updatePassenger(id, { mapX, mapY });
   }
 
   async function handleAlightConfirm(
@@ -239,8 +246,31 @@ export default function SurveyTrip() {
         <div className="section-title">
           乗車中の客（タップして降車を記録）
         </div>
+        <div className="view-tabs">
+          <button
+            type="button"
+            className={"view-tab" + (viewMode === "list" ? " selected" : "")}
+            onClick={() => setViewMode("list")}
+          >
+            リスト
+          </button>
+          <button
+            type="button"
+            className={"view-tab" + (viewMode === "map" ? " selected" : "")}
+            onClick={() => setViewMode("map")}
+          >
+            図
+          </button>
+        </div>
+
         {onboard.length === 0 ? (
           <div className="empty-state">現在乗車中の客はいません。</div>
+        ) : viewMode === "map" ? (
+          <BusFloorMap
+            passengers={onboard}
+            onMove={handleMovePassenger}
+            onTap={(p) => setAlightingTarget(p)}
+          />
         ) : (
           onboard.map((p) => (
             <div

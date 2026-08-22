@@ -99,4 +99,6 @@ export interface PassengerRecord {
   fare: number | null; // 区間料金
   alightedAt: number | null;
   status: PassengerStatus;
+  mapX: number; // 車内見取り図上の位置（0〜1、左右）
+  mapY: number; // 車内見取り図上の位置（0〜1、前後。0が前方）
 }

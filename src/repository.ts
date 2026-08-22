@@ -70,6 +70,9 @@ export async function addBoardingPassenger(
     const survey = await db.surveys.get(surveyId);
     if (!survey) throw new Error("Survey not found");
     const passengerNumber = survey.nextPassengerNumber;
+    // 新規乗車時は前方付近に少しずつずらして仮配置し、後で車内見取り図上で自由に動かせるようにする
+    const col = (passengerNumber - 1) % 4;
+    const row = Math.floor(((passengerNumber - 1) % 12) / 4);
     const record: PassengerRecord = {
       id: uuid(),
       surveyId,
@@ -83,6 +86,8 @@ export async function addBoardingPassenger(
       fare: null,
       alightedAt: null,
       status: "onboard",
+      mapX: 0.2 + col * 0.2,
+      mapY: 0.08 + row * 0.06,
     };
     await db.passengers.add(record);
     await db.surveys.update(surveyId, {
