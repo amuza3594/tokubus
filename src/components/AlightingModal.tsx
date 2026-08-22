@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ATTRIBUTE_LABEL,
   GENDER_LABEL,
@@ -7,6 +7,7 @@ import {
   type PassengerRecord,
   type PaymentMethod,
 } from "../types";
+import { lookupFare } from "../fareTable";
 
 interface Props {
   passenger: PassengerRecord;
@@ -29,7 +30,22 @@ export default function AlightingModal({
     null,
   );
   const [fare, setFare] = useState("");
+  const [fareTouched, setFareTouched] = useState(false);
   const [stopName, setStopName] = useState(currentStopName);
+
+  // GTFS運賃データ（大人・現金の基本区間運賃）から自動入力する。手入力で
+  // 上書きされた後は、降車バス停を変更しても自動入力で上書きしない。
+  useEffect(() => {
+    if (fareTouched) return;
+    let cancelled = false;
+    lookupFare(passenger.boardingStopName, stopName).then((price) => {
+      if (cancelled || price === null) return;
+      setFare(String(price));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [passenger.boardingStopName, stopName, fareTouched]);
 
   return (
     <div className="modal-backdrop" onClick={onCancel}>
@@ -67,12 +83,17 @@ export default function AlightingModal({
         </div>
 
         <div className="field">
-          <label>基本区間運賃（円）※後で入力も可</label>
+          <label>
+            基本区間運賃（円）※GTFS運賃データから自動入力・修正可
+          </label>
           <input
             type="number"
             inputMode="numeric"
             value={fare}
-            onChange={(e) => setFare(e.target.value)}
+            onChange={(e) => {
+              setFareTouched(true);
+              setFare(e.target.value);
+            }}
             placeholder="例: 210"
           />
         </div>
