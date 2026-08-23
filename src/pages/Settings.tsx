@@ -206,6 +206,19 @@ function AdminPanel({ onLogout }: { onLogout: () => void }) {
           アップロードすると、GitHub上のデータが更新され、全端末のアプリに反映されます
           （1〜2分程度かかります）。
         </p>
+        <p style={{ fontSize: 13, color: "var(--color-text-muted)" }}>
+          zipファイルには、以下の7つのファイルが同梱されている必要があります（GTFSフィードを
+          ダウンロードしたzipであれば、通常そのまま全て含まれています）。
+        </p>
+        <ul style={{ fontSize: 13, color: "var(--color-text-muted)", marginTop: 0, paddingLeft: 20 }}>
+          <li>stops.txt</li>
+          <li>routes.txt</li>
+          <li>trips.txt</li>
+          <li>stop_times.txt</li>
+          <li>shapes.txt</li>
+          <li>fare_attributes.txt</li>
+          <li>fare_rules.txt</li>
+        </ul>
 
         {statusError && (
           <div className="route-match" style={{ color: "var(--color-danger)" }}>
