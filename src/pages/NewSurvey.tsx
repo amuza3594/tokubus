@@ -49,22 +49,33 @@ export default function NewSurvey() {
     [routeNumber, effectiveDirection],
   );
 
-  // 系統番号入力時：まだ未入力の項目だけ自動補完する（手入力済みの内容は上書きしない）
+  // 系統番号入力時：路線名・起終点・系統キロを、その系統番号の内容に常に合わせて更新する
+  // （別の系統番号に入れ直した場合も追従する。手入力で上書きしたい場合は、この後に
+  // 各欄を編集すればよい）
   function handleRouteNumberChange(value: string) {
     setRouteNumber(value);
     setDirection(null);
     const route = findRoute(value);
-    if (!route) return;
-    setRouteName((prev) => (prev.trim() === "" ? route.name : prev));
+    if (!route) {
+      setRouteName("");
+      setOriginStop("");
+      setDestinationStop("");
+      setRouteDistanceKm("");
+      return;
+    }
+    setRouteName(route.name);
     const dirs = availableDirections(value);
     const stops = getStopSequence(value, dirs[0] ?? null);
-    if (!stops || stops.length === 0) return;
-    setOriginStop((prev) => (prev.trim() === "" ? stops[0] : prev));
-    setDestinationStop((prev) => (prev.trim() === "" ? stops[stops.length - 1] : prev));
-    const distanceKm = getRouteDistanceKm(value, dirs[0] ?? null);
-    if (distanceKm !== null) {
-      setRouteDistanceKm((prev) => (prev.trim() === "" ? String(distanceKm) : prev));
+    if (!stops || stops.length === 0) {
+      setOriginStop("");
+      setDestinationStop("");
+      setRouteDistanceKm("");
+      return;
     }
+    setOriginStop(stops[0]);
+    setDestinationStop(stops[stops.length - 1]);
+    const distanceKm = getRouteDistanceKm(value, dirs[0] ?? null);
+    setRouteDistanceKm(distanceKm !== null ? String(distanceKm) : "");
   }
 
   // 上下区分の切り替え：進行方向が変わるので起終点・系統キロは常に入れ替える
