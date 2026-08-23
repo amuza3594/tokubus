@@ -9,6 +9,7 @@ import {
   buildStopMaster,
   buildFareTable,
   relabelWithLegacyNumbers,
+  findGtfsZipEntry,
 } from "../../shared/gtfsBuilder.js";
 import legacyRoutePatterns from "../../shared/legacyRoutePatterns.json" with { type: "json" };
 import { hashPassword, verifyPassword, signSession, verifySession } from "./auth.js";
@@ -83,7 +84,7 @@ export default {
         const missing = [];
         const files = {};
         for (const name of REQUIRED_GTFS_FILES) {
-          const entry = zip.file(name);
+          const entry = findGtfsZipEntry(zip, name);
           if (!entry) {
             missing.push(name);
             continue;

@@ -16,6 +16,26 @@ export const REQUIRED_GTFS_FILES = [
   "fare_rules.txt",
 ];
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+// GTFS配布元によっては、zip直下ではなく1つフォルダを挟んだ中に各txtファイルが
+// 入っていることがある。zip直下を探して見つからなければ、階層を問わず探す
+// （ただしMacが自動生成する __MACOSX/ 配下のゴミファイルは除外し、複数見つかった
+// 場合はパスが最も浅いものを採用する）。
+export function findGtfsZipEntry(zip, filename) {
+  const direct = zip.file(filename);
+  if (direct) return direct;
+  const pattern = new RegExp(`(^|/)${escapeRegExp(filename)}$`);
+  const matches = zip
+    .file(pattern)
+    .filter((entry) => !entry.name.split("/").some((part) => part === "__MACOSX" || part.startsWith("._")));
+  if (matches.length === 0) return null;
+  matches.sort((a, b) => a.name.length - b.name.length);
+  return matches[0];
+}
+
 export function parseCsv(text) {
   const rows = [];
   const lines = text.replace(/^﻿/, "").split(/\r\n|\n/).filter((l) => l.length > 0);

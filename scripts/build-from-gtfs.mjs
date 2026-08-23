@@ -17,7 +17,13 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
-import { REQUIRED_GTFS_FILES, buildStopMaster, buildFareTable, relabelWithLegacyNumbers } from "../shared/gtfsBuilder.js";
+import {
+  REQUIRED_GTFS_FILES,
+  buildStopMaster,
+  buildFareTable,
+  relabelWithLegacyNumbers,
+  findGtfsZipEntry,
+} from "../shared/gtfsBuilder.js";
 import legacyRoutePatterns from "../shared/legacyRoutePatterns.json" with { type: "json" };
 
 const GTFS_DIR = fileURLToPath(new URL("../data/gtfs/", import.meta.url));
@@ -32,7 +38,7 @@ async function extractZipIfGiven() {
   const zip = await JSZip.loadAsync(buf);
   mkdirSync(GTFS_DIR, { recursive: true });
   for (const name of REQUIRED_GTFS_FILES) {
-    const entry = zip.file(name);
+    const entry = findGtfsZipEntry(zip, name);
     if (!entry) {
       console.warn(`  警告: zip内に ${name} が見つかりません（スキップ）`);
       continue;
