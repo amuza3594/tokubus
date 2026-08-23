@@ -4,7 +4,13 @@
 // src/data/stopMaster.json・fareTable.json を1コミットで更新する（→ 既存の
 // GitHub Actionsワークフローが自動でビルド・再デプロイし、全端末に反映される）。
 import JSZip from "jszip";
-import { REQUIRED_GTFS_FILES, buildStopMaster, buildFareTable } from "../../shared/gtfsBuilder.js";
+import {
+  REQUIRED_GTFS_FILES,
+  buildStopMaster,
+  buildFareTable,
+  relabelWithLegacyNumbers,
+} from "../../shared/gtfsBuilder.js";
+import legacyRoutePatterns from "../../shared/legacyRoutePatterns.json" with { type: "json" };
 import { hashPassword, verifyPassword, signSession, verifySession } from "./auth.js";
 import { commitGtfsData, fetchCurrentGtfsStats } from "./github.js";
 
@@ -91,7 +97,8 @@ export default {
           );
         }
 
-        const stopMaster = buildStopMaster(files);
+        const rawStopMaster = buildStopMaster(files);
+        const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns);
         const fareTableRaw = buildFareTable(files);
         const fareTable = { names: fareTableRaw.names, pairs: fareTableRaw.pairs };
 

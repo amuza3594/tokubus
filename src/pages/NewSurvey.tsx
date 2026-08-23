@@ -163,23 +163,15 @@ export default function NewSurvey() {
         </div>
 
         <div className="card">
-          <div className="field-row">
-            <div className="field">
-              <label>路線名</label>
-              <input
-                value={routeName}
-                onChange={(e) => setRouteName(e.target.value)}
-                placeholder="例: 神山線"
-              />
-            </div>
-            <div className="field">
-              <label>系統番号 *</label>
-              <input
-                value={routeNumber}
-                onChange={(e) => handleRouteNumberChange(e.target.value)}
-                placeholder="例: 2541"
-              />
-            </div>
+          <div className="field">
+            <label>系統番号 *</label>
+            <input
+              value={routeNumber}
+              onChange={(e) => handleRouteNumberChange(e.target.value)}
+              placeholder="例: 2541"
+              inputMode="numeric"
+              autoFocus
+            />
           </div>
 
           {matchedRoute ? (
@@ -190,10 +182,19 @@ export default function NewSurvey() {
           ) : (
             routeNumber.trim() !== "" && (
               <div className="route-match route-match-none">
-                バス停マスタに系統番号 {routeNumber} は見つかりません。停留所は手入力になります。
+                バス停マスタに系統番号 {routeNumber} は見つかりません。以下の項目は手入力になります。
               </div>
             )
           )}
+
+          <div className="field">
+            <label>路線名</label>
+            <input
+              value={routeName}
+              onChange={(e) => setRouteName(e.target.value)}
+              placeholder="例: 神山線"
+            />
+          </div>
 
           {directions.length > 1 && (
             <div className="field">

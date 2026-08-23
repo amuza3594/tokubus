@@ -168,6 +168,155 @@ export function buildStopMaster(files) {
   return master;
 }
 
+function stopSimilarity(a, b) {
+  const setA = new Set(a);
+  const setB = new Set(b);
+  let inter = 0;
+  for (const x of setA) if (setB.has(x)) inter++;
+  const union = new Set([...setA, ...setB]).size;
+  const jaccard = union === 0 ? 0 : inter / union;
+  const exact = JSON.stringify(a) === JSON.stringify(b) ? 1 : 0;
+  return jaccard + exact; // 完全一致は2.0、それ以外は0〜1.0
+}
+
+function flipLastDigit(num) {
+  const last = num[num.length - 1];
+  if (last === "1") return num.slice(0, -1) + "2";
+  if (last === "2") return num.slice(0, -1) + "1";
+  return null;
+}
+
+const CONFIDENT_MATCH_THRESHOLD = 1.5;
+
+// GTFSのdirection_idは往路・復路のどちらが0/1かを意味しないため、buildStopMaster()の
+// 出力（GTFSのroute_idをキーとし、方向を便宜上「往」「復」と割り当てたもの）を、
+// 実際の系統番号ごとの停車順データ（legacyPatterns、過去のバス停マスタCSV由来）と
+// 突き合わせて、実在する系統番号をキーとした形に組み直す。
+//
+// 突き合わせ方針:
+// - 各GTFS方向の停車順を、legacyPatternsの全パターンと比較し、最も一致するものを探す
+// - 完全一致（スコア2.0）が見つかった方向は、その系統番号・上下区分を採用する
+// - もう片方の方向は、まず「系統番号の末尾1↔2を入れ替えた番号」で一致するか試し
+//   （実際の運用で往復が末尾1/2で区別されているケースに対応）、それが無ければ
+//   独立に最良一致を探す（ただし採用済みの番号とは重複させない）
+// - 両方向とも確信を持って対応付けられなかった系統は、元のGTFS route_idのまま
+//   （両方向を便宜上のラベルで内包した形）に残し、呼び出し側で上下区分の手動選択
+//   にフォールバックできるようにする
+export function relabelWithLegacyNumbers(stopMaster, legacyPatterns) {
+  const byKey = new Map(); // "num\tdir" -> stops[]
+  for (const p of legacyPatterns) {
+    byKey.set(`${p.num}\t${p.dir}`, p.stops);
+  }
+
+  function bestMatch(stops, excludeNum) {
+    let best = null;
+    for (const [key, patternStops] of byKey) {
+      const [num] = key.split("\t");
+      if (excludeNum && num === excludeNum) continue;
+      const score = stopSimilarity(stops, patternStops);
+      if (score > 0 && (!best || score > best.score)) best = { key, score };
+    }
+    return best;
+  }
+
+  const relabeled = {};
+  const usedNumbers = new Set();
+
+  function claim(num, dir, entry) {
+    relabeled[num] = { name: entry.name, directions: { [dir]: entry.direction } };
+    usedNumbers.add(num);
+  }
+
+  for (const [routeId, route] of Object.entries(stopMaster)) {
+    const dirEntries = Object.entries(route.directions); // [["往", {...}], ["復", {...}]]
+
+    if (dirEntries.length === 1) {
+      const [, direction] = dirEntries[0];
+      const top = bestMatch(direction.stops);
+      if (top && top.score >= CONFIDENT_MATCH_THRESHOLD) {
+        const [num, dir] = top.key.split("\t");
+        if (!usedNumbers.has(num)) {
+          claim(num, dir, { name: route.name, direction });
+          continue;
+        }
+      }
+      relabeled[routeId] = route; // フォールバック: GTFSのroute_idのまま
+      continue;
+    }
+
+    const [[gLabelA, dirA], [gLabelB, dirB]] = dirEntries;
+    const topA = bestMatch(dirA.stops);
+    const topB = bestMatch(dirB.stops);
+    const strongA = topA && topA.score >= CONFIDENT_MATCH_THRESHOLD;
+    const strongB = topB && topB.score >= CONFIDENT_MATCH_THRESHOLD;
+
+    let assignA = null;
+    let assignB = null;
+
+    function assignFromAnchor(anchorTop, anchorDirData, otherDirData) {
+      const [anchorNum, anchorDir] = anchorTop.key.split("\t");
+      const anchorAssign = { num: anchorNum, dir: anchorDir, entry: { name: route.name, direction: anchorDirData } };
+      const flipped = flipLastDigit(anchorNum);
+      let otherAssign = null;
+      if (flipped) {
+        for (const dir of ["往", "復"]) {
+          if (byKey.has(`${flipped}\t${dir}`)) {
+            otherAssign = { num: flipped, dir, entry: { name: route.name, direction: otherDirData } };
+            break;
+          }
+        }
+      }
+      if (!otherAssign) {
+        const alt = bestMatch(otherDirData.stops, anchorNum);
+        if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
+          const [num, dir] = alt.key.split("\t");
+          otherAssign = { num, dir, entry: { name: route.name, direction: otherDirData } };
+        }
+      }
+      return [anchorAssign, otherAssign];
+    }
+
+    if (strongA && !strongB) {
+      [assignA, assignB] = assignFromAnchor(topA, dirA, dirB);
+    } else if (strongB && !strongA) {
+      [assignB, assignA] = assignFromAnchor(topB, dirB, dirA);
+    } else if (strongA && strongB) {
+      const [numA] = topA.key.split("\t");
+      const [numB] = topB.key.split("\t");
+      if (numA !== numB) {
+        assignA = { num: numA, dir: topA.key.split("\t")[1], entry: { name: route.name, direction: dirA } };
+        assignB = { num: numB, dir: topB.key.split("\t")[1], entry: { name: route.name, direction: dirB } };
+      } else if (topA.score >= topB.score) {
+        assignA = { num: numA, dir: topA.key.split("\t")[1], entry: { name: route.name, direction: dirA } };
+        const alt = bestMatch(dirB.stops, numA);
+        if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
+          const [num, dir] = alt.key.split("\t");
+          assignB = { num, dir, entry: { name: route.name, direction: dirB } };
+        }
+      } else {
+        assignB = { num: numB, dir: topB.key.split("\t")[1], entry: { name: route.name, direction: dirB } };
+        const alt = bestMatch(dirA.stops, numB);
+        if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
+          const [num, dir] = alt.key.split("\t");
+          assignA = { num, dir, entry: { name: route.name, direction: dirA } };
+        }
+      }
+    }
+
+    const bothResolved =
+      assignA && assignB && !usedNumbers.has(assignA.num) && !usedNumbers.has(assignB.num) && assignA.num !== assignB.num;
+
+    if (bothResolved) {
+      claim(assignA.num, assignA.dir, assignA.entry);
+      claim(assignB.num, assignB.dir, assignB.entry);
+    } else {
+      relabeled[routeId] = route; // 片方でも不確実ならフォールバック
+    }
+  }
+
+  return relabeled;
+}
+
 export function buildFareTable(files) {
   const stops = parseCsv(files["stops.txt"]);
   const fareAttributes = parseCsv(files["fare_attributes.txt"]);

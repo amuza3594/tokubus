@@ -17,7 +17,8 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import JSZip from "jszip";
-import { REQUIRED_GTFS_FILES, buildStopMaster, buildFareTable } from "../shared/gtfsBuilder.js";
+import { REQUIRED_GTFS_FILES, buildStopMaster, buildFareTable, relabelWithLegacyNumbers } from "../shared/gtfsBuilder.js";
+import legacyRoutePatterns from "../shared/legacyRoutePatterns.json" with { type: "json" };
 
 const GTFS_DIR = fileURLToPath(new URL("../data/gtfs/", import.meta.url));
 const STOP_MASTER_OUT = fileURLToPath(new URL("../src/data/stopMaster.json", import.meta.url));
@@ -53,9 +54,10 @@ function readGtfsFiles() {
 await extractZipIfGiven();
 const files = readGtfsFiles();
 
-const stopMaster = buildStopMaster(files);
+const rawStopMaster = buildStopMaster(files);
+const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns);
 writeFileSync(STOP_MASTER_OUT, JSON.stringify(stopMaster));
-console.log(`バス停マスタ: 路線 ${Object.keys(stopMaster).length}件 / ${(Buffer.byteLength(JSON.stringify(stopMaster)) / 1024).toFixed(1)} KB`);
+console.log(`バス停マスタ: 系統 ${Object.keys(stopMaster).length}件 / ${(Buffer.byteLength(JSON.stringify(stopMaster)) / 1024).toFixed(1)} KB`);
 
 const fareTable = buildFareTable(files);
 writeFileSync(FARE_TABLE_OUT, JSON.stringify({ names: fareTable.names, pairs: fareTable.pairs }));
