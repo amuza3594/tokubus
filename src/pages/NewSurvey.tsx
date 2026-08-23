@@ -50,6 +50,7 @@ export default function NewSurvey() {
 
   function handleCopyPrevious() {
     if (!lastSurvey) return;
+    setDate(lastSurvey.date);
     setDriverName(lastSurvey.driverName);
     setSurveyorName(lastSurvey.surveyorName);
     setDutyNumber(lastSurvey.dutyNumber);
@@ -142,6 +143,15 @@ export default function NewSurvey() {
       </div>
       <form className="page" onSubmit={handleSubmit}>
         <div className="card">
+          {lastSurvey && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCopyPrevious}
+            >
+              前回の入力を引用
+            </button>
+          )}
           <div className="field">
             <label>日付</label>
             <input
@@ -150,15 +160,6 @@ export default function NewSurvey() {
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
-          {lastSurvey && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={handleCopyPrevious}
-            >
-              前回の入力を引用（乗務員・調査員・仕業番号・車号）
-            </button>
-          )}
           <div className="field-row">
             <div className="field">
               <label>乗務員氏名</label>
