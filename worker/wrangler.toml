@@ -12,4 +12,4 @@ GITHUB_BRANCH = "claude/tokushima-bus-survey-digitalization-j5syhq"
 # KVネームスペース（パスワードのハッシュを保存する場所）
 [[kv_namespaces]]
 binding = "ADMIN_KV"
-id = "0a38e0da08acfc98e652cd818b4cf8c4"
+id = "ce63a9e9c76e4d0ab7df0ef042769d5a"
