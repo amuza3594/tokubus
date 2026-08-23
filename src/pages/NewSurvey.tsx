@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useLiveQuery } from "dexie-react-hooks";
+import db from "../db";
 import { createSurvey } from "../repository";
 import {
   DIRECTION_LABEL,
@@ -40,6 +42,19 @@ export default function NewSurvey() {
   const [destinationStop, setDestinationStop] = useState("");
   const [routeDistanceKm, setRouteDistanceKm] = useState("");
   const [saving, setSaving] = useState(false);
+
+  const lastSurvey = useLiveQuery(
+    () => db.surveys.orderBy("createdAt").reverse().first(),
+    [],
+  );
+
+  function handleCopyPrevious() {
+    if (!lastSurvey) return;
+    setDriverName(lastSurvey.driverName);
+    setSurveyorName(lastSurvey.surveyorName);
+    setDutyNumber(lastSurvey.dutyNumber);
+    setVehicleNumber(lastSurvey.vehicleNumber);
+  }
 
   const matchedRoute = useMemo(() => findRoute(routeNumber), [routeNumber]);
   const directions = useMemo(() => availableDirections(routeNumber), [routeNumber]);
@@ -135,6 +150,15 @@ export default function NewSurvey() {
               onChange={(e) => setDate(e.target.value)}
             />
           </div>
+          {lastSurvey && (
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={handleCopyPrevious}
+            >
+              前回の入力を引用（乗務員・調査員・仕業番号・車号）
+            </button>
+          )}
           <div className="field-row">
             <div className="field">
               <label>乗務員氏名</label>
