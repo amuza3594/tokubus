@@ -67,64 +67,7 @@ export default function AlightingModal({
   return (
     <div className="modal-backdrop" onClick={onCancel}>
       <div className="modal-sheet" onClick={(e) => e.stopPropagation()}>
-        <h2>客番号 {passenger.passengerNumber} の乗車記録修正・降車記録</h2>
-
-        <div className="field-with-button">
-          <div className="field">
-            <label>乗車バス停</label>
-            <input
-              value={boardingStopName}
-              onChange={(e) => setBoardingStopName(e.target.value)}
-            />
-          </div>
-          <button
-            type="button"
-            className="btn btn-outline"
-            onClick={() =>
-              onFixBoarding(boardingStopName.trim(), gender, attribute)
-            }
-          >
-            修正
-          </button>
-        </div>
-
-        <div className="field">
-          <label>性別</label>
-          <div className="chip-group">
-            <button
-              type="button"
-              className={"chip gender-male" + (gender === "male" ? " selected" : "")}
-              onClick={() => setGender("male")}
-            >
-              {GENDER_LABEL.male}
-            </button>
-            <button
-              type="button"
-              className={
-                "chip gender-female" + (gender === "female" ? " selected" : "")
-              }
-              onClick={() => setGender("female")}
-            >
-              {GENDER_LABEL.female}
-            </button>
-          </div>
-        </div>
-
-        <div className="field">
-          <label>属性</label>
-          <div className="chip-group">
-            {ATTRIBUTE_ORDER.map((a) => (
-              <button
-                type="button"
-                key={a}
-                className={"chip" + (attribute === a ? " selected" : "")}
-                onClick={() => setAttribute(a)}
-              >
-                {ATTRIBUTE_LABEL[a]}
-              </button>
-            ))}
-          </div>
-        </div>
+        <h2>客番号 {passenger.passengerNumber} の降車記録</h2>
 
         <div className="field">
           <label>降車バス停</label>
@@ -187,6 +130,64 @@ export default function AlightingModal({
             降車を記録する
           </button>
         </div>
+
+        <hr className="modal-divider" />
+
+        <div className="field">
+          <label>乗車バス停</label>
+          <input
+            value={boardingStopName}
+            onChange={(e) => setBoardingStopName(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label>性別</label>
+          <div className="chip-group">
+            <button
+              type="button"
+              className={"chip gender-male" + (gender === "male" ? " selected" : "")}
+              onClick={() => setGender("male")}
+            >
+              {GENDER_LABEL.male}
+            </button>
+            <button
+              type="button"
+              className={
+                "chip gender-female" + (gender === "female" ? " selected" : "")
+              }
+              onClick={() => setGender("female")}
+            >
+              {GENDER_LABEL.female}
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <label>属性</label>
+          <div className="chip-group">
+            {ATTRIBUTE_ORDER.map((a) => (
+              <button
+                type="button"
+                key={a}
+                className={"chip" + (attribute === a ? " selected" : "")}
+                onClick={() => setAttribute(a)}
+              >
+                {ATTRIBUTE_LABEL[a]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-outline"
+          onClick={() =>
+            onFixBoarding(boardingStopName.trim(), gender, attribute)
+          }
+        >
+          乗車記録の修正
+        </button>
       </div>
     </div>
   );

@@ -151,20 +151,10 @@ a {
   flex: 1;
 }
 
-.field-with-button {
-  display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  margin-bottom: 14px;
-}
-
-.field-with-button > .field {
-  flex: 1;
-  margin-bottom: 0;
-}
-
-.field-with-button > .btn {
-  flex-shrink: 0;
+.modal-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 20px 0;
 }
 
 .btn {
