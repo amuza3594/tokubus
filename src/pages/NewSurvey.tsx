@@ -20,13 +20,6 @@ function today() {
   ).padStart(2, "0")}`;
 }
 
-function nowTime() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(
-    d.getMinutes(),
-  ).padStart(2, "0")}`;
-}
-
 export default function NewSurvey() {
   const navigate = useNavigate();
   const [date, setDate] = useState(today());
@@ -38,7 +31,7 @@ export default function NewSurvey() {
   const [routeNumber, setRouteNumber] = useState("");
   const [direction, setDirection] = useState<Direction | null>(null);
   const [originStop, setOriginStop] = useState("");
-  const [originDepartureTime, setOriginDepartureTime] = useState(nowTime());
+  const [originDepartureTime, setOriginDepartureTime] = useState("");
   const [destinationStop, setDestinationStop] = useState("");
   const [routeDistanceKm, setRouteDistanceKm] = useState("");
   const [saving, setSaving] = useState(false);
@@ -105,7 +98,10 @@ export default function NewSurvey() {
     if (distanceKm !== null) setRouteDistanceKm(String(distanceKm));
   }
 
-  const canSubmit = routeNumber.trim() !== "" && originStop.trim() !== "";
+  const canSubmit =
+    routeNumber.trim() !== "" &&
+    originStop.trim() !== "" &&
+    originDepartureTime.trim() !== "";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -263,7 +259,7 @@ export default function NewSurvey() {
             />
           </div>
           <div className="field">
-            <label>始発時刻</label>
+            <label>始発時刻 *</label>
             <input
               type="time"
               value={originDepartureTime}
