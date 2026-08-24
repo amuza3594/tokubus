@@ -128,7 +128,7 @@ export function buildStopMaster(files) {
     tripStops.get(tripId).push([Number(st.stop_sequence), name]);
   }
 
-  // (routeId, directionId) -> [{pattern: string[], shapeKm: number|null}, ...]
+  // (routeId, directionId) -> [{pattern: string[], shapeId: string, shapeKm: number|null}, ...]
   const groups = new Map();
   for (const [tripId, items] of tripStops) {
     const info = tripInfo.get(tripId);
@@ -139,6 +139,7 @@ export function buildStopMaster(files) {
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push({
       pattern,
+      shapeId: info.shapeId,
       shapeKm: info.shapeId ? (shapeLengthKm.get(info.shapeId) ?? null) : null,
     });
   }
@@ -150,6 +151,20 @@ export function buildStopMaster(files) {
       : null;
   }
 
+  // パターンの中で最も多く使われているshape_idを、そのパターンの代表shape_idとする
+  function modeShapeId(items) {
+    const counts = new Map();
+    for (const i of items) {
+      if (!i.shapeId) continue;
+      counts.set(i.shapeId, (counts.get(i.shapeId) ?? 0) + 1);
+    }
+    let best = null;
+    for (const [id, count] of counts) {
+      if (!best || count > best.count) best = { id, count };
+    }
+    return best ? best.id : null;
+  }
+
   const master = {};
   // 同一(route_id, direction_id)の中に、便によって停車順が異なる複数のパターンが
   // 混在する場合がある。多くは便ごとの微妙なゆらぎ（ノイズ）だが、中には
@@ -159,6 +174,18 @@ export function buildStopMaster(files) {
   // それ以外のパターンもextraCandidatesとして残し、relabelWithLegacyNumbers側で
   // 旧マスタと突き合わせて実系統番号と確実に一致すれば別系統として拾えるようにする
   // （一致しなければ従来通り捨てられるだけなので、既存の挙動を壊さない）。
+  //
+  // shape_id -> そのshape_idを使うパターン(文字列化)の集合。1つのshape_idに
+  // 複数の異なるパターンが結びついている場合、そのshape_idは系統番号として
+  // 信頼できない（後述のrelabelWithLegacyNumbers側でshape_idを直接系統番号として
+  // 使う際、あいまいなshape_idを除外するために使う）。
+  const shapeIdPatternKeys = new Map();
+  function notePattern(shapeId, patternKey) {
+    if (!shapeId) return;
+    if (!shapeIdPatternKeys.has(shapeId)) shapeIdPatternKeys.set(shapeId, new Set());
+    shapeIdPatternKeys.get(shapeId).add(patternKey);
+  }
+
   const extraCandidates = [];
   for (const [key, entries] of groups) {
     const [routeId, directionId] = key.split(" ");
@@ -168,6 +195,7 @@ export function buildStopMaster(files) {
       const patternKey = JSON.stringify(e.pattern);
       if (!byPattern.has(patternKey)) byPattern.set(patternKey, { pattern: e.pattern, items: [] });
       byPattern.get(patternKey).items.push(e);
+      notePattern(e.shapeId, patternKey);
     }
     const sorted = [...byPattern.values()].sort(
       (a, b) => b.items.length - a.items.length || b.pattern.length - a.pattern.length,
@@ -181,6 +209,7 @@ export function buildStopMaster(files) {
       stops: best.pattern,
       distanceKm: averageDistanceKm(best.items),
       destination: best.pattern[best.pattern.length - 1],
+      shapeId: modeShapeId(best.items),
     });
 
     for (let i = 1; i < sorted.length; i++) {
@@ -190,8 +219,18 @@ export function buildStopMaster(files) {
         stops: group.pattern,
         distanceKm: averageDistanceKm(group.items),
         destination: group.pattern[group.pattern.length - 1],
+        shapeId: modeShapeId(group.items),
       });
     }
+  }
+
+  // 複数の異なる停車パターンに使い回されているshape_idは、系統番号の代わりとして
+  // 信頼できないため、後段のshape_idベース照合では無視する
+  const ambiguousShapeIds = new Set(
+    [...shapeIdPatternKeys].filter(([, set]) => set.size > 1).map(([id]) => id),
+  );
+  for (const c of extraCandidates) {
+    if (c.shapeId && ambiguousShapeIds.has(c.shapeId)) c.shapeId = null;
   }
 
   for (const routeId of Object.keys(master)) {
@@ -203,6 +242,7 @@ export function buildStopMaster(files) {
         stops: entry.stops,
         distanceKm: entry.distanceKm,
         destination: entry.destination,
+        shapeId: entry.shapeId && ambiguousShapeIds.has(entry.shapeId) ? null : entry.shapeId,
       };
     });
   }
@@ -232,22 +272,27 @@ const CONFIDENT_MATCH_THRESHOLD = 1.5;
 
 // GTFSのdirection_idは往路・復路のどちらが0/1かを意味しないため、buildStopMaster()の
 // 出力（GTFSのroute_idをキーとし、方向を便宜上「往」「復」と割り当てたもの）を、
-// 実際の系統番号ごとの停車順データ（legacyPatterns、過去のバス停マスタCSV由来）と
-// 突き合わせて、実在する系統番号をキーとした形に組み直す。
+// 実在する系統番号をキーとした形に組み直す。
 //
-// 突き合わせ方針:
-// - 各GTFS方向の停車順を、legacyPatternsの全パターンと比較し、最も一致するものを探す
-// - 完全一致（スコア2.0）が見つかった方向は、その系統番号・上下区分を採用する
-// - もう片方の方向は、まず「系統番号の末尾1↔2を入れ替えた番号」で一致するか試し
-//   （実際の運用で往復が末尾1/2で区別されているケースに対応）、それが無ければ
-//   独立に最良一致を探す（ただし採用済みの番号とは重複させない）
-// - 両方向とも確信を持って対応付けられなかった系統は、元のGTFS route_idのまま
-//   （両方向を便宜上のラベルで内包した形）に残し、呼び出し側で上下区分の手動選択
-//   にフォールバックできるようにする
+// 判定の優先順位:
+// 1. shape_id直接一致: このGTFSフィードでは、shape_idが実際の系統番号そのもの
+//    （末尾1=往路、末尾2=復路）になっているケースが大半を占める。shape_idが数字
+//    のみで末尾が1か2、かつそのshape_idが複数の異なる停車パターンに使い回されて
+//    いない（あいまいでない）場合は、これを実系統番号として最優先で採用する。
+//    生のGTFSデータそのものに基づく判定であり、過去の停車順データより信頼できる
+//    （過去データが古くなって現状と食い違うケース、例えば経由地が1つ増えた
+//    枝分かれ系統などにも対応できる）。
+// 2. legacyPatterns突き合わせ: shape_idが使えない（非数値・末尾が1/2でない・
+//    あいまい）場合のみ、過去の停車順データ（legacyPatterns）と比較して最も
+//    一致するものを探すフォールバック判定を行う（完全一致に近いスコアのみ採用）。
+//
+// 2方向とも確信を持って対応付けられなかった系統は、元のGTFS route_idのまま
+// （両方向を便宜上のラベルで内包した形）に残し、呼び出し側で上下区分の手動選択に
+// フォールバックできるようにする。
 //
 // extraCandidatesは、buildStopMaster()が同一route_id・direction_idの中で
 // 最頻パターンとして採用しなかった停車順（枝分かれ系統など）。それぞれ独立に
-// legacyPatternsとの確実な一致を試み、一致すればその実系統番号として新たに追加する
+// 上記の優先順位で判定し、一致すればその実系統番号として新たに追加する
 // （一致しなければ何もしない＝これまで通り単に捨てられるだけなので、既存の
 // 挙動への影響はない）。
 export function relabelWithLegacyNumbers(stopMaster, legacyPatterns, extraCandidates = []) {
@@ -267,6 +312,14 @@ export function relabelWithLegacyNumbers(stopMaster, legacyPatterns, extraCandid
     return best;
   }
 
+  function directionFromShapeId(shapeId) {
+    if (!shapeId || !/^[0-9]+$/.test(shapeId)) return null;
+    const last = shapeId[shapeId.length - 1];
+    if (last === "1") return "往";
+    if (last === "2") return "復";
+    return null;
+  }
+
   const relabeled = {};
   const usedNumbers = new Set();
 
@@ -275,80 +328,92 @@ export function relabelWithLegacyNumbers(stopMaster, legacyPatterns, extraCandid
     usedNumbers.add(num);
   }
 
+  // 実系統番号・方向を解決する（shape_id直接一致を最優先、無ければ旧マスタ突き合わせ）
+  function resolveDirect(direction) {
+    const shapeDir = directionFromShapeId(direction.shapeId);
+    if (shapeDir && !usedNumbers.has(direction.shapeId)) {
+      return { num: direction.shapeId, dir: shapeDir, source: "shape" };
+    }
+    const top = bestMatch(direction.stops);
+    if (top && top.score >= CONFIDENT_MATCH_THRESHOLD) {
+      const [num, dir] = top.key.split("\t");
+      if (!usedNumbers.has(num)) return { num, dir, source: "legacy" };
+    }
+    return null;
+  }
+
   for (const [routeId, route] of Object.entries(stopMaster)) {
     const dirEntries = Object.entries(route.directions); // [["往", {...}], ["復", {...}]]
 
     if (dirEntries.length === 1) {
       const [, direction] = dirEntries[0];
-      const top = bestMatch(direction.stops);
-      if (top && top.score >= CONFIDENT_MATCH_THRESHOLD) {
-        const [num, dir] = top.key.split("\t");
-        if (!usedNumbers.has(num)) {
-          claim(num, dir, { name: route.name, direction });
-          continue;
-        }
+      const resolved = resolveDirect(direction);
+      if (resolved) {
+        claim(resolved.num, resolved.dir, { name: route.name, direction });
+        continue;
       }
       relabeled[routeId] = route; // フォールバック: GTFSのroute_idのまま
       continue;
     }
 
     const [[gLabelA, dirA], [gLabelB, dirB]] = dirEntries;
-    const topA = bestMatch(dirA.stops);
-    const topB = bestMatch(dirB.stops);
-    const strongA = topA && topA.score >= CONFIDENT_MATCH_THRESHOLD;
-    const strongB = topB && topB.score >= CONFIDENT_MATCH_THRESHOLD;
+    const resA = resolveDirect(dirA);
+    const resB = resolveDirect(dirB);
 
     let assignA = null;
     let assignB = null;
 
-    function assignFromAnchor(anchorTop, anchorDirData, otherDirData) {
-      const [anchorNum, anchorDir] = anchorTop.key.split("\t");
-      const anchorAssign = { num: anchorNum, dir: anchorDir, entry: { name: route.name, direction: anchorDirData } };
-      const flipped = flipLastDigit(anchorNum);
+    function assignFromAnchor(anchorRes, anchorDirData, otherDirData) {
+      const anchorAssign = {
+        num: anchorRes.num,
+        dir: anchorRes.dir,
+        entry: { name: route.name, direction: anchorDirData },
+      };
       let otherAssign = null;
-      if (flipped) {
-        for (const dir of ["往", "復"]) {
-          if (byKey.has(`${flipped}\t${dir}`)) {
-            otherAssign = { num: flipped, dir, entry: { name: route.name, direction: otherDirData } };
-            break;
-          }
+      // 相方のshape_idそのものが、anchorの番号の末尾1↔2を入れ替えた番号なら、それを最優先で採用
+      const flipped = flipLastDigit(anchorRes.num);
+      if (flipped && !usedNumbers.has(flipped)) {
+        if (otherDirData.shapeId === flipped) {
+          otherAssign = {
+            num: flipped,
+            dir: directionFromShapeId(flipped),
+            entry: { name: route.name, direction: otherDirData },
+          };
+        } else if (byKey.has(`${flipped}\t往`) || byKey.has(`${flipped}\t復`)) {
+          const dir = byKey.has(`${flipped}\t往`) ? "往" : "復";
+          otherAssign = { num: flipped, dir, entry: { name: route.name, direction: otherDirData } };
         }
       }
       if (!otherAssign) {
-        const alt = bestMatch(otherDirData.stops, anchorNum);
-        if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
-          const [num, dir] = alt.key.split("\t");
-          otherAssign = { num, dir, entry: { name: route.name, direction: otherDirData } };
+        const otherResolved = resolveDirect(otherDirData);
+        if (otherResolved && otherResolved.num !== anchorRes.num) {
+          otherAssign = { num: otherResolved.num, dir: otherResolved.dir, entry: { name: route.name, direction: otherDirData } };
+        } else {
+          const alt = bestMatch(otherDirData.stops, anchorRes.num);
+          if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
+            const [num, dir] = alt.key.split("\t");
+            otherAssign = { num, dir, entry: { name: route.name, direction: otherDirData } };
+          }
         }
       }
       return [anchorAssign, otherAssign];
     }
 
-    if (strongA && !strongB) {
-      [assignA, assignB] = assignFromAnchor(topA, dirA, dirB);
-    } else if (strongB && !strongA) {
-      [assignB, assignA] = assignFromAnchor(topB, dirB, dirA);
-    } else if (strongA && strongB) {
-      const [numA] = topA.key.split("\t");
-      const [numB] = topB.key.split("\t");
-      if (numA !== numB) {
-        assignA = { num: numA, dir: topA.key.split("\t")[1], entry: { name: route.name, direction: dirA } };
-        assignB = { num: numB, dir: topB.key.split("\t")[1], entry: { name: route.name, direction: dirB } };
-      } else if (topA.score >= topB.score) {
-        assignA = { num: numA, dir: topA.key.split("\t")[1], entry: { name: route.name, direction: dirA } };
-        const alt = bestMatch(dirB.stops, numA);
-        if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
-          const [num, dir] = alt.key.split("\t");
-          assignB = { num, dir, entry: { name: route.name, direction: dirB } };
-        }
-      } else {
-        assignB = { num: numB, dir: topB.key.split("\t")[1], entry: { name: route.name, direction: dirB } };
-        const alt = bestMatch(dirA.stops, numB);
-        if (alt && alt.score >= CONFIDENT_MATCH_THRESHOLD) {
-          const [num, dir] = alt.key.split("\t");
-          assignA = { num, dir, entry: { name: route.name, direction: dirA } };
-        }
+    if (resA && !resB) {
+      [assignA, assignB] = assignFromAnchor(resA, dirA, dirB);
+    } else if (resB && !resA) {
+      [assignB, assignA] = assignFromAnchor(resB, dirB, dirA);
+    } else if (resA && resB) {
+      if (resA.num !== resB.num) {
+        assignA = { num: resA.num, dir: resA.dir, entry: { name: route.name, direction: dirA } };
+        assignB = { num: resB.num, dir: resB.dir, entry: { name: route.name, direction: dirB } };
+      } else if (resA.source === "shape" && resB.source !== "shape") {
+        assignA = { num: resA.num, dir: resA.dir, entry: { name: route.name, direction: dirA } };
+      } else if (resB.source === "shape" && resA.source !== "shape") {
+        assignB = { num: resB.num, dir: resB.dir, entry: { name: route.name, direction: dirB } };
       }
+      // 両方が同じ番号に解決し、どちらを優先すべきか判断できない場合は、
+      // 下のbothResolvedチェックに任せる（片方のみ確定＝フォールバックへ）
     }
 
     const bothResolved =
@@ -363,14 +428,19 @@ export function relabelWithLegacyNumbers(stopMaster, legacyPatterns, extraCandid
   }
 
   for (const candidate of extraCandidates) {
-    const top = bestMatch(candidate.stops);
-    if (!top || top.score < CONFIDENT_MATCH_THRESHOLD) continue;
-    const [num, dir] = top.key.split("\t");
-    if (usedNumbers.has(num)) continue;
-    claim(num, dir, {
+    const resolved = resolveDirect(candidate);
+    if (!resolved) continue;
+    claim(resolved.num, resolved.dir, {
       name: candidate.name,
       direction: { stops: candidate.stops, distanceKm: candidate.distanceKm, destination: candidate.destination },
     });
+  }
+
+  // shape_idは判定用の内部情報なので、最終出力には含めない
+  for (const route of Object.values(relabeled)) {
+    for (const direction of Object.values(route.directions)) {
+      delete direction.shapeId;
+    }
   }
 
   return relabeled;
