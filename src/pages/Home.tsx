@@ -1,6 +1,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import db from "../db";
+import { deleteSurvey } from "../repository";
 import { exportAllSurveysToExcel } from "../utils/export";
 import type { PassengerRecord } from "../types";
 
@@ -26,6 +27,18 @@ export default function Home() {
       bySurvey.set(p.surveyId, list);
     }
     exportAllSurveysToExcel(surveys, bySurvey);
+  }
+
+  async function handleDeleteSurvey(e: React.MouseEvent, id: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (
+      confirm(
+        "この調査記録と乗降データを全て削除します。よろしいですか？（元に戻せません）",
+      )
+    ) {
+      await deleteSurvey(id);
+    }
   }
 
   return (
@@ -83,6 +96,14 @@ export default function Home() {
                     {s.status === "in_progress" ? "調査中" : "完了"}
                   </span>
                 </Link>
+                <button
+                  type="button"
+                  className="survey-delete-btn"
+                  aria-label="この調査を削除"
+                  onClick={(e) => handleDeleteSurvey(e, s.id)}
+                >
+                  削除
+                </button>
               </li>
             ))}
           </ul>
