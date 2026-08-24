@@ -98,8 +98,8 @@ export default {
           );
         }
 
-        const rawStopMaster = buildStopMaster(files);
-        const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns);
+        const { master: rawStopMaster, extraCandidates } = buildStopMaster(files);
+        const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns, extraCandidates);
         const fareTableRaw = buildFareTable(files);
         const fareTable = { names: fareTableRaw.names, pairs: fareTableRaw.pairs };
 

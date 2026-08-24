@@ -60,8 +60,8 @@ function readGtfsFiles() {
 await extractZipIfGiven();
 const files = readGtfsFiles();
 
-const rawStopMaster = buildStopMaster(files);
-const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns);
+const { master: rawStopMaster, extraCandidates } = buildStopMaster(files);
+const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns, extraCandidates);
 writeFileSync(STOP_MASTER_OUT, JSON.stringify(stopMaster));
 console.log(`バス停マスタ: 系統 ${Object.keys(stopMaster).length}件 / ${(Buffer.byteLength(JSON.stringify(stopMaster)) / 1024).toFixed(1)} KB`);
 

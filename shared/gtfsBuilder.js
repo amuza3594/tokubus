@@ -143,7 +143,23 @@ export function buildStopMaster(files) {
     });
   }
 
+  function averageDistanceKm(items) {
+    const kmValues = items.map((i) => i.shapeKm).filter((v) => v !== null && v > 0);
+    return kmValues.length > 0
+      ? Math.round((kmValues.reduce((a, b) => a + b, 0) / kmValues.length) * 10) / 10
+      : null;
+  }
+
   const master = {};
+  // 同一(route_id, direction_id)の中に、便によって停車順が異なる複数のパターンが
+  // 混在する場合がある。多くは便ごとの微妙なゆらぎ（ノイズ）だが、中には
+  // 同じroute_id・direction_idを共有する別の実系統番号（枝分かれ系統。例:
+  // 系統2531/2532が系統2541/2542と同じroute_id・方向を共有するケース）が
+  // 紛れていることがある。最頻パターンはこれまで通りmasterの往復に採用しつつ、
+  // それ以外のパターンもextraCandidatesとして残し、relabelWithLegacyNumbers側で
+  // 旧マスタと突き合わせて実系統番号と確実に一致すれば別系統として拾えるようにする
+  // （一致しなければ従来通り捨てられるだけなので、既存の挙動を壊さない）。
+  const extraCandidates = [];
   for (const [key, entries] of groups) {
     const [routeId, directionId] = key.split(" ");
 
@@ -153,23 +169,29 @@ export function buildStopMaster(files) {
       if (!byPattern.has(patternKey)) byPattern.set(patternKey, { pattern: e.pattern, items: [] });
       byPattern.get(patternKey).items.push(e);
     }
-    const best = [...byPattern.values()].sort(
+    const sorted = [...byPattern.values()].sort(
       (a, b) => b.items.length - a.items.length || b.pattern.length - a.pattern.length,
-    )[0];
+    );
+    const best = sorted[0];
+    const routeName = routeIdToName.get(routeId) ?? "";
 
-    const kmValues = best.items.map((i) => i.shapeKm).filter((v) => v !== null && v > 0);
-    const distanceKm =
-      kmValues.length > 0
-        ? Math.round((kmValues.reduce((a, b) => a + b, 0) / kmValues.length) * 10) / 10
-        : null;
-
-    if (!master[routeId]) master[routeId] = { name: routeIdToName.get(routeId) ?? "", directions: {}, _raw: [] };
+    if (!master[routeId]) master[routeId] = { name: routeName, directions: {}, _raw: [] };
     master[routeId]._raw.push({
       directionId,
       stops: best.pattern,
-      distanceKm,
+      distanceKm: averageDistanceKm(best.items),
       destination: best.pattern[best.pattern.length - 1],
     });
+
+    for (let i = 1; i < sorted.length; i++) {
+      const group = sorted[i];
+      extraCandidates.push({
+        name: routeName,
+        stops: group.pattern,
+        distanceKm: averageDistanceKm(group.items),
+        destination: group.pattern[group.pattern.length - 1],
+      });
+    }
   }
 
   for (const routeId of Object.keys(master)) {
@@ -185,7 +207,7 @@ export function buildStopMaster(files) {
     });
   }
 
-  return master;
+  return { master, extraCandidates };
 }
 
 function stopSimilarity(a, b) {
@@ -222,7 +244,13 @@ const CONFIDENT_MATCH_THRESHOLD = 1.5;
 // - 両方向とも確信を持って対応付けられなかった系統は、元のGTFS route_idのまま
 //   （両方向を便宜上のラベルで内包した形）に残し、呼び出し側で上下区分の手動選択
 //   にフォールバックできるようにする
-export function relabelWithLegacyNumbers(stopMaster, legacyPatterns) {
+//
+// extraCandidatesは、buildStopMaster()が同一route_id・direction_idの中で
+// 最頻パターンとして採用しなかった停車順（枝分かれ系統など）。それぞれ独立に
+// legacyPatternsとの確実な一致を試み、一致すればその実系統番号として新たに追加する
+// （一致しなければ何もしない＝これまで通り単に捨てられるだけなので、既存の
+// 挙動への影響はない）。
+export function relabelWithLegacyNumbers(stopMaster, legacyPatterns, extraCandidates = []) {
   const byKey = new Map(); // "num\tdir" -> stops[]
   for (const p of legacyPatterns) {
     byKey.set(`${p.num}\t${p.dir}`, p.stops);
@@ -332,6 +360,17 @@ export function relabelWithLegacyNumbers(stopMaster, legacyPatterns) {
     } else {
       relabeled[routeId] = route; // 片方でも不確実ならフォールバック
     }
+  }
+
+  for (const candidate of extraCandidates) {
+    const top = bestMatch(candidate.stops);
+    if (!top || top.score < CONFIDENT_MATCH_THRESHOLD) continue;
+    const [num, dir] = top.key.split("\t");
+    if (usedNumbers.has(num)) continue;
+    claim(num, dir, {
+      name: candidate.name,
+      direction: { stops: candidate.stops, distanceKm: candidate.distanceKm, destination: candidate.destination },
+    });
   }
 
   return relabeled;
