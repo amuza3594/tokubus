@@ -110,12 +110,26 @@ export default function SurveyTrip() {
     await updatePassenger(id, { mapX, mapY });
   }
 
+  async function handleFixBoarding(
+    boardingStopName: string,
+    gender: Gender,
+    attribute: Attribute,
+  ) {
+    if (!alightingTarget) return;
+    await updatePassenger(alightingTarget.id, { boardingStopName, gender, attribute });
+    setAlightingTarget(null);
+  }
+
   async function handleAlightConfirm(
+    boardingStopName: string,
+    gender: Gender,
+    attribute: Attribute,
     stopName: string,
     paymentMethod: PaymentMethod | null,
     fare: number | null,
   ) {
     if (!alightingTarget) return;
+    await updatePassenger(alightingTarget.id, { boardingStopName, gender, attribute });
     await recordAlighting(alightingTarget.id, stopName, paymentMethod, fare);
     setAlightingTarget(null);
   }
@@ -305,6 +319,7 @@ export default function SurveyTrip() {
           passenger={alightingTarget}
           currentStopName={currentStop}
           onCancel={() => setAlightingTarget(null)}
+          onFixBoarding={handleFixBoarding}
           onConfirm={handleAlightConfirm}
         />
       )}

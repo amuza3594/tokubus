@@ -151,6 +151,22 @@ a {
   flex: 1;
 }
 
+.field-with-button {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+
+.field-with-button > .field {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.field-with-button > .btn {
+  flex-shrink: 0;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
