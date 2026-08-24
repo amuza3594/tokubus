@@ -9,6 +9,7 @@ import {
   buildStopMaster,
   buildFareTable,
   relabelWithLegacyNumbers,
+  applyKnownStopCorrections,
   findGtfsZipEntry,
 } from "../../shared/gtfsBuilder.js";
 import legacyRoutePatterns from "../../shared/legacyRoutePatterns.json" with { type: "json" };
@@ -99,7 +100,9 @@ export default {
         }
 
         const { master: rawStopMaster, extraCandidates } = buildStopMaster(files);
-        const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns, extraCandidates);
+        const stopMaster = applyKnownStopCorrections(
+          relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns, extraCandidates),
+        );
         const fareTableRaw = buildFareTable(files);
         const fareTable = { names: fareTableRaw.names, pairs: fareTableRaw.pairs };
 

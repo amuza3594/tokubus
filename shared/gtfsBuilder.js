@@ -446,6 +446,31 @@ export function relabelWithLegacyNumbers(stopMaster, legacyPatterns, extraCandid
   return relabeled;
 }
 
+// GTFSフィード自体に停留所が抜け落ちているなど、運行事業者へ確認の上でしか
+// 判別できない誤り・欠落を補正するための一覧。GTFSデータを差し替えても
+// 該当箇所に同じ抜けが残っていれば自動的に補われ、運行事業者側で修正されれば
+// （afterが見つからない、またはinsertが既に隣接している）何もしない安全な仕組み。
+//
+// - 系統7612（95 小松島線）: GTFSの当該便のstop_times.txtで「南小松島小学校前」の
+//   次に本来ある「南小松島駅前」が記録されておらず抜け落ちている（利用者からの
+//   報告により確認・2026-08確認）。両停留所の位置関係からも経路上にあることが
+//   裏付けられる。
+const KNOWN_STOP_CORRECTIONS = [{ num: "7612", after: "南小松島小学校前", insert: "南小松島駅前" }];
+
+export function applyKnownStopCorrections(stopMaster, corrections = KNOWN_STOP_CORRECTIONS) {
+  for (const { num, after, insert } of corrections) {
+    const route = stopMaster[num];
+    if (!route) continue;
+    for (const direction of Object.values(route.directions)) {
+      const idx = direction.stops.indexOf(after);
+      if (idx === -1) continue; // 補正対象の停留所が無い（運行事業者側で経路が変わった等）
+      if (direction.stops[idx + 1] === insert) continue; // 既に隣接済み（データが修正された等）
+      direction.stops.splice(idx + 1, 0, insert);
+    }
+  }
+  return stopMaster;
+}
+
 export function buildFareTable(files) {
   const stops = parseCsv(files["stops.txt"]);
   const fareAttributes = parseCsv(files["fare_attributes.txt"]);

@@ -22,6 +22,7 @@ import {
   buildStopMaster,
   buildFareTable,
   relabelWithLegacyNumbers,
+  applyKnownStopCorrections,
   findGtfsZipEntry,
 } from "../shared/gtfsBuilder.js";
 import legacyRoutePatterns from "../shared/legacyRoutePatterns.json" with { type: "json" };
@@ -61,7 +62,9 @@ await extractZipIfGiven();
 const files = readGtfsFiles();
 
 const { master: rawStopMaster, extraCandidates } = buildStopMaster(files);
-const stopMaster = relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns, extraCandidates);
+const stopMaster = applyKnownStopCorrections(
+  relabelWithLegacyNumbers(rawStopMaster, legacyRoutePatterns, extraCandidates),
+);
 writeFileSync(STOP_MASTER_OUT, JSON.stringify(stopMaster));
 console.log(`バス停マスタ: 系統 ${Object.keys(stopMaster).length}件 / ${(Buffer.byteLength(JSON.stringify(stopMaster)) / 1024).toFixed(1)} KB`);
 
